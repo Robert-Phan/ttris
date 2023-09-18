@@ -48,8 +48,8 @@ class Graphic:
             for _ in range(0, 4)
         ]
 
-    def draw_tetrimino(self, erase_prev_tetrimino = True):
-        if erase_prev_tetrimino:
+    def draw_tetrimino(self, is_for_refresh: bool):
+        if not is_for_refresh:
             for block_rect in self.block_rects:
                 pygame.draw.rect(self.screen, (0, 0, 0), block_rect)
 
