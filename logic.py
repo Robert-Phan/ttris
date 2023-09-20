@@ -4,10 +4,7 @@ from typing import Callable, Self, NamedTuple, Optional
 import random
 
 from graphic import Graphic
-
-Block = tuple[int, int]
-Tetrimino = list[Block]
-Color = tuple[int, int, int]
+from type_aliases import *
 
 class Logic:
     def __init__(self, graphic: Graphic) -> None:
@@ -62,9 +59,10 @@ class Logic:
     def tetromino_fall_loop(self):
         pygame.time.set_timer(self.TETROMINOFALL, 1000)
 
-    def sync_graphic_and_logic(self, is_for_refresh = False):        
+    def sync_graphic_and_logic(self, is_for_refresh = False, rows_removed: bool = False):        
         self.graphic.tetrimino_blocks = [*self.current_tetrimino][:-1]
         self.graphic.draw_tetrimino(is_for_refresh)
+        self.graphic.update_fallen_block(self.fallen_blocks, rows_removed)
 
     movement_offsets = {
         pygame.K_DOWN: (0, 1),
@@ -74,15 +72,16 @@ class Logic:
         pygame.K_d: (-1, 1)
     }
 
-    fallen_blocks: set[Block] = set()
+    fallen_blocks: set[ColoredBlock] = set()
 
     @staticmethod
     def move_tetrimino_decor(move_tetri_func: Callable[[Self, int], Tetrimino]):
         def decorated_move_tetri_func(self: Self, movement_key: int):
+            fallen_blocks: set[Block] = {(x, y) for ((x, y), _) in self.fallen_blocks}
             new_tetrimino = move_tetri_func(self, movement_key)
 
             for (new_x, new_y) in new_tetrimino[:-1]:
-                if not (0 <= new_x < 10) or new_y >= 20 or (new_x, new_y) in self.fallen_blocks:
+                if not (0 <= new_x < 10) or new_y >= 20 or (new_x, new_y) in fallen_blocks:
                     if movement_key == pygame.K_DOWN:
                         self.refresh_tetrimino()
                     return 
@@ -148,11 +147,50 @@ class Logic:
         (1, 1)], (240, 0, 0)),
     ]
 
-    def refresh_tetrimino(self):
-        self.fallen_blocks.update(self.current_tetrimino[:-1])
+    tetromino_bag: list[tuple[Tetrimino, Color]] = []
 
-        refreshed_tetrimino = random.choice(self.tetrimino_variants)
-        self.current_tetrimino = refreshed_tetrimino[0]
+    def refresh_tetrimino(self):
+        new_fallen_blocks = [(x, self.graphic.tetrimino_color) for x in self.current_tetrimino[:-1]]
+        self.fallen_blocks.update(new_fallen_blocks)
+
+        rows_removed = self.remove_rows()
+
+        if not self.tetromino_bag:
+            self.tetromino_bag = random.sample(self.tetrimino_variants, len(self.tetrimino_variants))
+
+        refreshed_tetrimino = self.tetromino_bag.pop()
+        self.current_tetrimino = [(x + 3, y) for (x, y) in refreshed_tetrimino[0]]
         self.graphic.tetrimino_color = refreshed_tetrimino[1]
 
-        self.sync_graphic_and_logic(True)
+        self.sync_graphic_and_logic(True, rows_removed)
+    
+    def remove_rows(self):
+        blocks_num_for_every_row: dict[int, int] = {}
+
+        for block in self.fallen_blocks:
+            ((_, block_row), _) = block
+
+            if block_row not in blocks_num_for_every_row.keys():
+                blocks_num_for_every_row[block_row] = 0
+            
+            blocks_num_for_every_row[block_row] += 1
+        
+        rows_to_remove = [row for (row, blocks_num) in blocks_num_for_every_row.items()
+                        if blocks_num == 10]
+
+        if len(rows_to_remove) == 0: 
+            return False
+
+        new_fallen_blocks = set()
+        
+        for ((x, y), color) in self.fallen_blocks:
+            if y in rows_to_remove:
+                continue
+            
+            num_rows_below = len([row for row in rows_to_remove if row > y])
+
+            new_fallen_blocks.add(((x, y + num_rows_below), color))
+
+        self.fallen_blocks = new_fallen_blocks
+
+        return True

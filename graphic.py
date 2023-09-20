@@ -1,6 +1,5 @@
 import pygame
-
-Block = tuple[int, int]
+from type_aliases import *
 
 class Graphic:
     def __init__(self) -> None:
@@ -12,8 +11,10 @@ class Graphic:
     grid_padding_top = 10
     cell_size = 30
     cell_border = 2
+    block_size = cell_size - cell_border * 2
     grid_width = 10
     grid_height = 20
+    
 
     def draw_grid(self):
         """
@@ -42,9 +43,9 @@ class Graphic:
     tetrimino_color = (55, 155, 255)
 
     def init_block_rects(self):
-        block_size = self.cell_size - self.cell_border * 2
+        # block_size = self.cell_size - self.cell_border * 2
         self.block_rects = [
-            pygame.Rect(-self.cell_size, 0, block_size, block_size)
+            pygame.Rect(-self.cell_size, 0, self.block_size, self.block_size)
             for _ in range(0, 4)
         ]
 
@@ -54,11 +55,40 @@ class Graphic:
                 pygame.draw.rect(self.screen, (0, 0, 0), block_rect)
 
         for ((x, y), block_rect) in zip(self.tetrimino_blocks, self.block_rects):
-            rect_x = self.grid_padding_left + x * (self.cell_size - self.cell_border) + self.cell_border
-            rect_y = self.grid_padding_left + y * (self.cell_size - self.cell_border) + self.cell_border
+            (rect_x, rect_y) = self.block_coords_to_grid_position(x, y)
 
             block_rect.update(rect_x, rect_y, 
                             block_rect.width, block_rect.height)
             pygame.draw.rect(self.screen, self.tetrimino_color, block_rect)
 
+        pygame.display.flip()
+
+    def block_coords_to_grid_position(self, block_x: int, block_y: int):
+        rect_x = self.grid_padding_left + block_x * (self.cell_size - self.cell_border) + self.cell_border
+        rect_y = self.grid_padding_left + block_y * (self.cell_size - self.cell_border) + self.cell_border
+        return rect_x, rect_y
+    
+    fallen_blocks: set[ColoredBlock] = set()
+
+    def update_fallen_block(self, new_fallen_blocks: set[ColoredBlock], clear_line = False):
+        if not clear_line:
+            self.fallen_blocks = new_fallen_blocks
+            return
+        
+        block_rect = pygame.Rect(-1, -1, self.block_size, self.block_size)
+
+        for ((x, y), _) in self.fallen_blocks:
+            (rect_x, rect_y) = self.block_coords_to_grid_position(x, y)
+            
+            block_rect.update(rect_x, rect_y, 
+                            block_rect.width, block_rect.height)
+            pygame.draw.rect(self.screen, (0, 0, 0), block_rect)
+        
+        for ((x, y), color) in new_fallen_blocks:
+            (rect_x, rect_y) = self.block_coords_to_grid_position(x, y)
+            
+            block_rect.update(rect_x, rect_y, 
+                            block_rect.width, block_rect.height)
+            pygame.draw.rect(self.screen, color, block_rect)
+        
         pygame.display.flip()
