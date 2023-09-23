@@ -74,12 +74,17 @@ class Graphic:
                 pygame.draw.rect(self.screen, (200, 200, 200),
                                 grid_cell, self.cell_border)
 
-    current_tetrimino: list[Block] = []
+    current_tetrimino: Tetrimino = []
     held_tetrimino: ColoredTetrimino = []
-    tetrimino_color = (55, 155, 255)
+    drop_position: Tetrimino = []
+    tetrimino_color = (0, 0, 0)
 
     def init_block_rects(self):
         self.block_rects = [
+            pygame.Rect(-self.cell_size, 0, self.block_size, self.block_size)
+            for _ in range(0, 4)
+        ]
+        self.drop_pos_block_rects = [
             pygame.Rect(-self.cell_size, 0, self.block_size, self.block_size)
             for _ in range(0, 4)
         ]
@@ -87,6 +92,9 @@ class Graphic:
     def draw_tetrimino(self, draw_tetromino_settings: DrawTetrominoSettings):
         if draw_tetromino_settings == "hold":
             self.draw_hold_tetromino()
+        
+        # if draw_tetromino_settings == "move":
+        self.draw_drop_position(draw_tetromino_settings)
 
         if draw_tetromino_settings == "move" or draw_tetromino_settings == "hold":
             for block_rect in self.block_rects:
@@ -118,9 +126,21 @@ class Graphic:
             block_rect.update(rect_x, rect_y, 
                             block_rect.width, block_rect.height)
             pygame.draw.rect(self.screen, self.held_tetrimino[1], block_rect)
+    
+    def draw_drop_position(self, draw_tetromino_settings: DrawTetrominoSettings):
+        if draw_tetromino_settings == "move" or draw_tetromino_settings == "hold":
+            for block_rect in self.drop_pos_block_rects:
+                pygame.draw.rect(self.screen, (0, 0, 0), block_rect)
         
-        pygame.display.flip()
-
+        for ((x, y), block_rect) in zip(self.drop_position[:-1], self.drop_pos_block_rects):
+            (rect_x, rect_y) = self.block_coords_to_grid_position(x, y)
+            
+            block_rect.update(rect_x, rect_y, 
+                            block_rect.width, block_rect.height)
+                    
+            pygame.draw.rect(self.screen, self.tetrimino_color, block_rect, 2)
+        
+        
     def block_coords_to_grid_position(self, block_x: int, block_y: int, for_holding = False):
         margin_left = self.margin_left if for_holding else self.grid_margin_left
         rect_x = margin_left + block_x * (self.cell_size - self.cell_border) + self.cell_border

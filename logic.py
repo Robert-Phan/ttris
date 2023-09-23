@@ -42,6 +42,10 @@ class Logic:
                         self.graphic.game_over()
                         game_over = True
 
+                    case Event(type=pygame.KEYDOWN, key=pygame.K_SPACE):
+                        self.drop_tetrimino(0)
+                        self.shift_tetrimino(pygame.K_DOWN)
+
                     case Event(type=self.TETROMINOFALL):
                         self.shift_tetrimino(pygame.K_DOWN)
                     
@@ -76,8 +80,9 @@ class Logic:
 
     def sync_graphic_and_logic(self, draw_tetromino_settings: DrawTetrominoSettings, rows_removed: bool = False):        
         self.graphic.current_tetrimino = [*self.current_tetrimino]
-        self.graphic.draw_tetrimino(draw_tetromino_settings)
+        self.graphic.drop_position = [*self.drop_position]
         self.graphic.update_fallen_block(self.fallen_blocks, rows_removed)
+        self.graphic.draw_tetrimino(draw_tetromino_settings)
 
     movement_offsets = {
         pygame.K_DOWN: (0, 1),
@@ -88,6 +93,30 @@ class Logic:
     }
 
     fallen_blocks: set[ColoredBlock] = set()
+    drop_position: Tetrimino = []
+
+    def calculate_drop_pos(self):
+        columns_to_check = {x for (x, y) in self.current_tetrimino[:-1]}
+
+        smallest_drop_distance = 100
+
+        for col in columns_to_check:
+            lowest_tetrimino_block_in_col = max((
+                y for (x, y) in self.current_tetrimino[:-1]
+                if x == col
+            ))
+
+            highest_fallen_block_in_col = min((
+                y for ((x, y), _) in self.fallen_blocks
+                if x == col and y > lowest_tetrimino_block_in_col
+            ), default=self.graphic.grid_height)
+
+            drop_distance = highest_fallen_block_in_col - lowest_tetrimino_block_in_col
+
+            if drop_distance < smallest_drop_distance:
+                smallest_drop_distance = drop_distance
+        
+        self.drop_position = [(x, y + smallest_drop_distance - 1) for (x, y) in self.current_tetrimino]
 
     @staticmethod
     def move_tetrimino_decor(move_tetri_func: Callable[[Self, int], Tetrimino]):
@@ -102,11 +131,16 @@ class Logic:
                     return 
             
             self.current_tetrimino = new_tetrimino
+            self.calculate_drop_pos()
 
             self.sync_graphic_and_logic('move')
         
         return decorated_move_tetri_func
-    
+
+    @move_tetrimino_decor
+    def drop_tetrimino(self, _: int):
+        return self.drop_position
+
     @move_tetrimino_decor
     def shift_tetrimino(self, movement_key: int):
         (offset_x, offset_y) = self.movement_offsets[movement_key]
@@ -174,10 +208,13 @@ class Logic:
 
         if old_held_tetrimino == ():
             self.refresh_tetrimino(for_holding='new hold')
-        else:
-            self.current_tetrimino = self.tetrimino_starting_position(old_held_tetrimino[0])
-            self.graphic.tetrimino_color = old_held_tetrimino[1]
-            self.sync_graphic_and_logic('hold')
+            return
+        
+        self.current_tetrimino = self.tetrimino_starting_position(old_held_tetrimino[0])
+        self.graphic.tetrimino_color = old_held_tetrimino[1]
+        self.calculate_drop_pos()
+        
+        self.sync_graphic_and_logic('hold')
 
     tetromino_bag: list[ColoredTetrimino] = []
 
@@ -198,6 +235,8 @@ class Logic:
         refreshed_tetrimino = self.tetromino_bag.pop()
         self.current_tetrimino = self.tetrimino_starting_position(refreshed_tetrimino[0])
         self.graphic.tetrimino_color = refreshed_tetrimino[1]
+
+        self.calculate_drop_pos()
 
         self.sync_graphic_and_logic('refresh' if for_holding == "no hold" else 'hold', rows_removed)
     
