@@ -81,6 +81,7 @@ class Logic:
     def sync_graphic_and_logic(self, draw_tetromino_settings: DrawTetrominoSettings, rows_removed: bool = False):        
         self.graphic.current_tetrimino = [*self.current_tetrimino]
         self.graphic.drop_position = [*self.drop_position]
+        self.graphic.tetrimino_bag = [*self.tetromino_bag]
         self.graphic.update_fallen_block(self.fallen_blocks, rows_removed)
         self.graphic.draw_tetrimino(draw_tetromino_settings)
 
@@ -229,8 +230,9 @@ class Logic:
             pygame.event.post(Event(self.GAMEOVER))
             return
 
-        if not self.tetromino_bag:
-            self.tetromino_bag = random.sample(self.tetrimino_variants, len(self.tetrimino_variants))
+        if len(self.tetromino_bag) < 7:
+            self.tetromino_bag = random.sample(self.tetrimino_variants, len(self.tetrimino_variants)) \
+                                + self.tetromino_bag
 
         refreshed_tetrimino = self.tetromino_bag.pop()
         self.current_tetrimino = self.tetrimino_starting_position(refreshed_tetrimino[0])
